@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useNavigate, Navigate } from 'react-router-dom';
 import { supabase } from './supabaseClient';
-import { Calendar, CheckCircle, QrCode, Trash2, Play, LogOut, Lock, FileText, ArrowLeft, CreditCard, Plus, Clock, List, Edit, Save, X, Image, Upload, MapPin } from 'lucide-react';
+import { Calendar, CheckCircle, QrCode, Trash2, Play, LogOut, Lock, FileText, ArrowLeft, CreditCard, Plus, Clock, List, Edit, Save, X, Image, Upload, MapPin, Download } from 'lucide-react';
 import { QRCodeCanvas } from 'qrcode.react';
 import { format, differenceInSeconds } from 'date-fns';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 
 // --- COMPONENTS ---
 
@@ -43,6 +45,7 @@ const Login = () => {
   const [errorMsg, setErrorMsg] = useState('');
   const navigate = useNavigate();
   const handleLogin = async (e) => {
+    e.preventDefault();
     setErrorMsg('');
 
     const { error } = await supabase.auth.signInWithPassword({ email, password });
@@ -245,6 +248,7 @@ const ManageCourts = () => {
   const [courts, setCourts] = useState([]);
   const [editingId, setEditingId] = useState(null);
   const [editForm, setEditForm] = useState({ name: '', price: '' });
+  const [newCourt, setNewCourt] = useState({ name: '', price: '' });
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -283,6 +287,31 @@ const ManageCourts = () => {
     }
   };
 
+  const handleAddCourt = async (e) => {
+    e.preventDefault();
+    if (!newCourt.name || !newCourt.price) return;
+
+    const { error } = await supabase.from('courts').insert([{
+      name: newCourt.name,
+      price: parseInt(newCourt.price)
+    }]);
+
+    if (error) {
+      alert('Gagal tambah lapangan: ' + error.message);
+    } else {
+      setNewCourt({ name: '', price: '' });
+      fetchCourts();
+    }
+  };
+
+  const handleDeleteCourt = async (id) => {
+    if (confirm('Hapus lapangan ini?')) {
+      const { error } = await supabase.from('courts').delete().eq('id', id);
+      if (error) alert('Gagal hapus: ' + error.message);
+      else fetchCourts();
+    }
+  };
+
   return (
     <div className="container mx-auto p-6 max-w-4xl">
       <button onClick={() => navigate('/admin')} className="mb-4 flex items-center gap-2 text-gray-600 hover:text-emerald-600">
@@ -291,6 +320,37 @@ const ManageCourts = () => {
       <h2 className="text-2xl font-bold text-emerald-800 mb-6 flex items-center gap-2">
         <List className="w-6 h-6" /> Kelola Lapangan
       </h2>
+
+      <div className="bg-white p-6 rounded-lg shadow-md mb-8">
+        <h3 className="font-bold text-lg mb-4">Tambah Lapangan Baru</h3>
+        <form onSubmit={handleAddCourt} className="grid md:grid-cols-3 gap-4 items-end">
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Nama Lapangan</label>
+            <input 
+              type="text" 
+              required 
+              className="w-full border p-2 rounded" 
+              value={newCourt.name} 
+              onChange={e => setNewCourt({...newCourt, name: e.target.value})} 
+              placeholder="Contoh: Lapangan 1"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Harga per Jam</label>
+            <input 
+              type="number" 
+              required 
+              className="w-full border p-2 rounded" 
+              value={newCourt.price} 
+              onChange={e => setNewCourt({...newCourt, price: e.target.value})} 
+              placeholder="Contoh: 50000"
+            />
+          </div>
+          <button type="submit" className="bg-emerald-600 text-white p-2 rounded hover:bg-emerald-700 font-bold flex justify-center items-center gap-1">
+            <Plus size={18} /> Tambah
+          </button>
+        </form>
+      </div>
 
       <div className="bg-white rounded-lg shadow overflow-hidden">
         <table className="w-full text-left">
@@ -339,9 +399,14 @@ const ManageCourts = () => {
                       </button>
                     </>
                   ) : (
-                    <button onClick={() => handleEditClick(court)} className="text-blue-600 hover:text-blue-800 p-2 bg-blue-100 rounded" title="Edit">
-                      <Edit size={18} />
-                    </button>
+                    <>
+                      <button onClick={() => handleEditClick(court)} className="text-blue-600 hover:text-blue-800 p-2 bg-blue-100 rounded" title="Edit">
+                        <Edit size={18} />
+                      </button>
+                      <button onClick={() => handleDeleteCourt(court.id)} className="text-red-600 hover:text-red-800 p-2 bg-red-100 rounded" title="Hapus">
+                        <Trash2 size={18} />
+                      </button>
+                    </>
                   )}
                 </td>
               </tr>
@@ -476,6 +541,7 @@ const UserView = () => {
   const [availableSchedules, setAvailableSchedules] = useState([]);
   const [arenaInfo, setArenaInfo] = useState({ name: '', address: '' });
   const [carouselImages, setCarouselImages] = useState([]);
+  const [selectedSchedules, setSelectedSchedules] = useState([]);
   
   // Form State
   const [formData, setFormData] = useState({
@@ -483,9 +549,6 @@ const UserView = () => {
     phone: '',
     court_id: '',
     date: '',
-    startTime: '',
-    endTime: '',
-    scheduleId: '' // ID dari tabel court_schedules
   });
 
   useEffect(() => {
@@ -528,17 +591,17 @@ const UserView = () => {
   };
 
   const handleSlotSelect = (schedule) => {
-    setFormData({
-      ...formData,
-      startTime: schedule.start_time,
-      endTime: schedule.end_time,
-      scheduleId: schedule.id
+    setSelectedSchedules(prev => {
+      if (prev.find(s => s.id === schedule.id)) {
+        return prev.filter(s => s.id !== schedule.id);
+      }
+      return [...prev, schedule];
     });
   };
 
   const handleNextStep = (e) => {
     e.preventDefault();
-    if (!formData.name || !formData.phone || !formData.court_id || !formData.date || !formData.scheduleId) {
+    if (!formData.name || !formData.phone || !formData.court_id || !formData.date || selectedSchedules.length === 0) {
       alert('Mohon lengkapi semua data formulir.');
       return;
     }
@@ -552,10 +615,6 @@ const UserView = () => {
       return;
     }
     setLoading(true);
-
-    // Gabungkan tanggal dan jam
-    const startDateTime = new Date(`${formData.date}T${formData.startTime}`);
-    const endDateTime = new Date(`${formData.date}T${formData.endTime}`);
 
     // 0. Upload Bukti Transfer (Jika ada)
     const fileExt = paymentFile.name.split('.').pop();
@@ -573,67 +632,144 @@ const UserView = () => {
     const { data: urlData } = supabase.storage.from('payment-proofs').getPublicUrl(fileName);
     const paymentProofUrl = urlData.publicUrl;
 
-    // 1. Insert Booking
+    // 1. Insert Multiple Bookings
+    const bookingsToInsert = selectedSchedules.map(schedule => {
+        const startDateTime = new Date(`${formData.date}T${schedule.start_time}`);
+        const endDateTime = new Date(`${formData.date}T${schedule.end_time}`);
+        return {
+            court_id: formData.court_id,
+            user_name: formData.name,
+            user_phone: formData.phone,
+            start_time: startDateTime.toISOString(),
+            end_time: endDateTime.toISOString(),
+            status: 'booked',
+            qr_code_string: '', // Update later
+            payment_proof_url: paymentProofUrl,
+            schedule_id: schedule.id
+        };
+    });
+
     const { data, error } = await supabase
       .from('bookings')
-      .insert([
-        {
-          court_id: formData.court_id,
-          user_name: formData.name,
-          user_phone: formData.phone,
-          start_time: startDateTime.toISOString(),
-          end_time: endDateTime.toISOString(),
-          status: 'booked',
-          qr_code_string: '', // Akan diupdate dengan ID nanti
-          payment_proof_url: paymentProofUrl,
-          schedule_id: formData.scheduleId
-        }
-      ])
-      .select()
-      .single();
+      .insert(bookingsToInsert)
+      .select();
 
     if (error) {
       alert('Gagal booking: ' + error.message);
     } else {
-      // 2. Update qr_code_string dengan ID booking itu sendiri
-      await supabase
-        .from('bookings')
-        .update({ qr_code_string: data.id })
-        .eq('id', data.id);
-
-      // 3. Update status jadwal jadi booked
-      if (formData.scheduleId) {
-        await supabase.from('court_schedules').update({ is_booked: true }).eq('id', formData.scheduleId);
+      // 2. Update qr_code_string & schedule status for each
+      for (const booking of data) {
+         await supabase.from('bookings').update({ qr_code_string: booking.id }).eq('id', booking.id);
+         await supabase.from('court_schedules').update({ is_booked: true }).eq('id', booking.schedule_id);
       }
       
-      setBookingSuccess({ ...data, qr_code_string: data.id });
+      setBookingSuccess(data); // Array of bookings
     }
     setLoading(false);
   };
 
-  if (bookingSuccess) {
+  if (bookingSuccess && bookingSuccess.length > 0) {
+    const firstBooking = bookingSuccess[0];
+    const bookedCourt = courts.find(c => c.id == firstBooking.court_id);
+
+    const handleDownloadPDF = async () => {
+      const element = document.getElementById('invoice-content');
+      if (!element) return;
+      const canvas = await html2canvas(element, { scale: 2 });
+      const data = canvas.toDataURL('image/png');
+      
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const imgProperties = pdf.getImageProperties(data);
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = (imgProperties.height * pdfWidth) / imgProperties.width;
+      
+      pdf.addImage(data, 'PNG', 0, 0, pdfWidth, pdfHeight);
+      pdf.save(`Invoice-${firstBooking.id.slice(0, 8).toUpperCase()}.pdf`);
+    };
+
     return (
-      <div className="max-w-md mx-auto mt-10 p-6 bg-white rounded-lg shadow-xl border-t-4 border-emerald-500 text-center">
-        <CheckCircle className="w-16 h-16 text-emerald-500 mx-auto mb-4" />
-        <h2 className="text-2xl font-bold text-gray-800 mb-2">Booking Berhasil!</h2>
-        <p className="text-gray-600 mb-6">Silahkan screenshot tiket ini.</p>
-        
-        <div className="bg-gray-100 p-4 rounded mb-4 flex justify-center">
-           <QRCodeCanvas value={bookingSuccess.qr_code_string} size={200} />
-        </div>
-        
-        <div className="text-left text-sm space-y-2 text-gray-700">
-          <p><strong>Nama:</strong> {bookingSuccess.user_name}</p>
-          <p><strong>Jadwal:</strong> {format(new Date(bookingSuccess.start_time), 'dd MMM yyyy, HH:mm')}</p>
-          <p><strong>Kode Booking:</strong> <span className="font-mono text-xs">{bookingSuccess.id}</span></p>
+      <div className="max-w-lg mx-auto mt-8">
+        <div id="invoice-content" className="bg-white rounded-xl shadow-2xl overflow-hidden border border-gray-100">
+        {/* Header Invoice */}
+        <div className="bg-emerald-600 p-6 text-white text-center relative overflow-hidden">
+          <div className="relative z-10">
+            <div className="flex flex-col items-center gap-2 mb-2">
+              {arenaInfo.logo_url ? (
+                <img src={arenaInfo.logo_url} alt="Logo" className="w-16 h-16 bg-white rounded-full object-contain p-1 shadow-md" />
+              ) : (
+                <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center text-emerald-600 text-2xl shadow-md">🏸</div>
+              )}
+              <h1 className="text-2xl font-bold tracking-wide">{arenaInfo.name || 'Bookminton Arena'}</h1>
+            </div>
+            <p className="text-emerald-100 text-sm max-w-xs mx-auto leading-relaxed">{arenaInfo.address || 'Alamat Arena'}</p>
+          </div>
+          {/* Dekorasi Background */}
+          <div className="absolute top-0 left-0 w-32 h-32 bg-white opacity-10 rounded-full -translate-x-10 -translate-y-10"></div>
+          <div className="absolute bottom-0 right-0 w-24 h-24 bg-white opacity-10 rounded-full translate-x-8 translate-y-8"></div>
         </div>
 
-        <button 
-          onClick={() => window.location.reload()}
-          className="mt-6 w-full bg-emerald-600 text-white py-2 rounded hover:bg-emerald-700"
-        >
-          Buat Pesanan Baru
-        </button>
+        <div className="p-8">
+          <div className="text-center mb-8">
+            <div className="inline-flex items-center gap-2 text-emerald-600 font-bold text-xl mb-1">
+              <CheckCircle className="w-6 h-6" /> BOOKING CONFIRMED
+            </div>
+            <p className="text-gray-500 text-sm">Silahkan screenshot bukti booking ini.</p>
+          </div>
+
+          {/* Detail Booking */}
+          <div className="bg-gray-50 rounded-lg p-4 border border-gray-100 space-y-3 text-sm mb-6">
+            <div className="flex justify-between border-b border-gray-200 pb-2">
+              <span className="text-gray-500">Kode Booking (Utama)</span>
+              <span className="font-mono font-bold text-gray-800">{firstBooking.id.slice(0, 8).toUpperCase()}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-500">Nama Pemesan</span>
+              <span className="font-medium text-gray-800">{firstBooking.user_name}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-500">Lapangan</span>
+              <span className="font-medium text-gray-800">{bookedCourt?.name || '-'}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-500">Tanggal</span>
+              <span className="font-medium text-gray-800">{format(new Date(firstBooking.start_time), 'dd MMMM yyyy')}</span>
+            </div>
+            <div className="flex flex-col gap-1 mt-2 border-t pt-2">
+              <span className="text-gray-500 text-sm">Jadwal Main:</span>
+              {bookingSuccess.map((b, idx) => (
+                  <div key={idx} className="flex justify-between font-bold text-emerald-600">
+                    <span>Sesi {idx + 1}</span>
+                    <span>{format(new Date(b.start_time), 'HH:mm')} - {format(new Date(b.end_time), 'HH:mm')}</span>
+                  </div>
+              ))}
+            </div>
+          </div>
+
+          {/* QR Code */}
+          <div className="flex flex-col items-center justify-center mb-6">
+            <div className="bg-white p-3 border-2 border-dashed border-gray-300 rounded-lg">
+              <QRCodeCanvas value={firstBooking.qr_code_string} size={160} />
+            </div>
+            <p className="text-xs text-gray-400 mt-2 text-center">Tunjukkan QR Code ini kepada petugas<br />saat check-in di arena.</p>
+          </div>
+
+        </div>
+        </div>
+
+        <div className="mt-4 flex gap-3">
+          <button
+            onClick={handleDownloadPDF}
+            className="flex-1 bg-emerald-600 text-white py-3 rounded-lg font-bold hover:bg-emerald-700 transition shadow-lg flex items-center justify-center gap-2"
+          >
+            <Download size={20} /> Download PDF
+          </button>
+          <button
+            onClick={() => window.location.reload()}
+            className="flex-1 bg-gray-900 text-white py-3 rounded-lg font-bold hover:bg-gray-800 transition shadow-lg"
+          >
+            Selesai / Pesan Lagi
+          </button>
+        </div>
       </div>
     );
   }
@@ -643,10 +779,12 @@ const UserView = () => {
   // Hitung durasi dan total harga
   let duration = 0;
   let totalPrice = 0;
-  if (formData.startTime && formData.endTime && selectedCourt) {
-    const start = new Date(`1970-01-01T${formData.startTime}`);
-    const end = new Date(`1970-01-01T${formData.endTime}`);
-    duration = (end - start) / (1000 * 60 * 60); // dalam jam
+  if (selectedSchedules.length > 0 && selectedCourt) {
+    duration = selectedSchedules.reduce((acc, curr) => {
+        const start = new Date(`1970-01-01T${curr.start_time}`);
+        const end = new Date(`1970-01-01T${curr.end_time}`);
+        return acc + (end - start) / (1000 * 60 * 60);
+    }, 0);
     totalPrice = duration * selectedCourt.price;
   }
 
@@ -665,7 +803,13 @@ const UserView = () => {
           <h2 className="text-white text-2xl font-bold">{arenaInfo.name || 'Arena Badminton'}</h2>
           <p className="text-emerald-200 flex items-center gap-1">
             <MapPin size={16} /> {arenaInfo.address || 'Alamat belum diatur'}
-          </p>  <h3 className="text-xl font-bold text-emerald-800 mb-4 flex items-center gap-2">
+          </p>
+        </div>
+      </div>
+
+      <div className="grid md:grid-cols-3 gap-8">
+        <div className="md:col-span-2">
+          <h3 className="text-xl font-bold text-emerald-800 mb-4 flex items-center gap-2">
             <Calendar className="w-5 h-5" /> {step === 1 ? 'Form Booking' : 'Pembayaran'}
           </h3>
           
@@ -694,23 +838,25 @@ const UserView = () => {
               </div>
               
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Pilih Jadwal Tersedia</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Pilih Jadwal Tersedia (Bisa pilih lebih dari 1)</label>
                 {!formData.court_id || !formData.date ? (
                   <p className="text-sm text-gray-500 italic">Pilih lapangan dan tanggal dulu.</p>
                 ) : availableSchedules.length === 0 ? (
                   <p className="text-sm text-red-500 italic">Tidak ada jadwal tersedia.</p>
                 ) : (
                   <div className="grid grid-cols-3 gap-2">
-                    {availableSchedules.map(s => (
+                    {availableSchedules.map(s => {
+                      const isSelected = selectedSchedules.find(sel => sel.id === s.id);
+                      return (
                       <button
                         key={s.id}
                         type="button"
                         onClick={() => handleSlotSelect(s)}
-                        className={`py-2 px-1 text-sm rounded border ${formData.scheduleId === s.id ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-gray-700 border-gray-300 hover:border-emerald-500'}`}
+                        className={`py-2 px-1 text-sm rounded border ${isSelected ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-gray-700 border-gray-300 hover:border-emerald-500'}`}
                       >
                         {s.start_time.slice(0,5)} - {s.end_time.slice(0,5)}
                       </button>
-                    ))}
+                    )})}
                   </div>
                 )}
               </div>
@@ -729,7 +875,15 @@ const UserView = () => {
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600">Jadwal:</span>
-                  <span className="font-medium">{formData.date}, {formData.startTime} - {formData.endTime} ({duration.toFixed(1)} Jam)</span>
+                  <div className="text-right">
+                      <div className="font-medium">{formData.date}</div>
+                      {selectedSchedules.map(s => (
+                          <div key={s.id} className="text-xs text-gray-500">
+                              {s.start_time.slice(0,5)} - {s.end_time.slice(0,5)}
+                          </div>
+                      ))}
+                      <div className="font-medium mt-1">({duration.toFixed(1)} Jam)</div>
+                  </div>
                 </div>
                 <div className="flex justify-between text-lg font-bold text-emerald-700 pt-2 border-t mt-2">
                   <span>Total Bayar:</span>
@@ -907,6 +1061,7 @@ const AdminView = () => {
         <table className="w-full text-left border-collapse">
           <thead className="bg-emerald-100 text-emerald-800">
             <tr>
+              <th className="p-4">Kode</th>
               <th className="p-4">Lapangan</th>
               <th className="p-4">User</th>
               <th className="p-4">Jadwal</th>
@@ -918,6 +1073,7 @@ const AdminView = () => {
           <tbody>
             {bookings.map((b) => (
               <tr key={b.id} className="border-b hover:bg-gray-50">
+                <td className="p-4 font-mono font-bold text-gray-700">{b.id.slice(0, 8).toUpperCase()}</td>
                 <td className="p-4 font-medium">{b.courts?.name}</td>
                 <td className="p-4">
                   <div className="font-bold">{b.user_name}</div>
