@@ -15,6 +15,11 @@ const ProtectedRoute = ({ children }) => {
 
   if (loading) return <div className="p-10 text-center">Loading...</div>;
   if (!session) return <Navigate to="/login" replace />;
+
+  if (session.user.user_metadata.role !== 'admin') {
+    return <Navigate to="/user/dashboard" replace />;
+  }
+
   return children;
 };
 

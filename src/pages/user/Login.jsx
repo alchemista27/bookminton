@@ -11,13 +11,18 @@ const UserLogin = () => {
   const handleLogin = async (e) => {
     e.preventDefault();
     setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) {
       alert('Login Gagal: ' + error.message);
       setLoading(false);
     } else {
-      // Redirect ke dashboard dengan state tab: 'booking' sesuai permintaan
-      navigate('/user/dashboard', { state: { tab: 'booking' } });
+      if (data.user?.user_metadata?.role === 'admin') {
+        navigate('/admin');
+      } else {
+        // Pastikan role user ada, jika tidak ada (akun lama), anggap user biasa
+        // Redirect ke dashboard dengan state tab: 'booking' sesuai permintaan
+        navigate('/user/dashboard', { state: { tab: 'booking' } });
+      }
     }
   };
 

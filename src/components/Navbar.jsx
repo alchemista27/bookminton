@@ -6,6 +6,7 @@ import { User, LogOut } from 'lucide-react';
 const Navbar = () => {
   const [brand, setBrand] = useState({ name: 'Bookminton', logo_url: '' });
   const [session, setSession] = useState(null);
+  const [isAdmin, setIsAdmin] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -17,10 +18,12 @@ const Navbar = () => {
 
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
+      setIsAdmin(session?.user?.user_metadata?.role === 'admin');
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
+      setIsAdmin(session?.user?.user_metadata?.role === 'admin');
     });
 
     return () => subscription.unsubscribe();
@@ -41,7 +44,7 @@ const Navbar = () => {
         <div className="space-x-4 flex items-center">
           {session ? (
             <>
-              <Link to="/user/dashboard" className="hover:text-emerald-200 flex items-center gap-1"><User size={18}/> Dashboard</Link>
+              <Link to={isAdmin ? "/admin" : "/user/dashboard"} className="hover:text-emerald-200 flex items-center gap-1"><User size={18}/> Dashboard</Link>
               <button onClick={handleLogout} className="hover:text-emerald-200 flex items-center gap-1"><LogOut size={18}/> Logout</button>
             </>
           ) : (

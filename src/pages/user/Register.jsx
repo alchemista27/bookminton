@@ -16,7 +16,8 @@ const UserRegister = () => {
       options: {
         data: {
           full_name: formData.name,
-          phone: formData.phone
+          phone: formData.phone,
+          role: 'user' // Set default role sebagai user
         }
       }
     });

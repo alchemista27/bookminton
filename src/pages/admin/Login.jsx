@@ -13,12 +13,17 @@ const Login = () => {
     e.preventDefault();
     setErrorMsg('');
 
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) {
       setErrorMsg('Login Gagal: ' + error.message);
       setLoading(false);
     } else {
-      navigate('/admin');
+      if (data.user?.user_metadata?.role === 'admin') {
+        navigate('/admin');
+      } else {
+        alert('Akun ini tidak memiliki izin akses Admin.');
+        navigate('/user/dashboard');
+      }
     }
   };
 
