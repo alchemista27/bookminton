@@ -12,7 +12,18 @@ const Navbar = () => {
   useEffect(() => {
     const fetchBrand = async () => {
       const { data } = await supabase.from('arena_settings').select('*').single();
-      if (data) setBrand(data);
+      if (data) {
+        setBrand(data);
+        if (data.logo_url) {
+          let link = document.querySelector("link[rel~='icon']");
+          if (!link) {
+            link = document.createElement('link');
+            link.rel = 'icon';
+            document.head.appendChild(link);
+          }
+          link.href = data.logo_url;
+        }
+      }
     };
     fetchBrand();
 

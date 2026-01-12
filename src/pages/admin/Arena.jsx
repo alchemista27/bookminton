@@ -4,7 +4,7 @@ import { supabase } from '../../supabaseClient';
 import { ArrowLeft, Image, Upload, Plus, Trash2 } from 'lucide-react';
 
 const ManageArena = () => {
-  const [settings, setSettings] = useState({ name: '', address: '', logo_url: '' });
+  const [settings, setSettings] = useState({ name: '', address: '', logo_url: '', bank_info: '', qris_url: '' });
   const [images, setImages] = useState([]);
   const [uploading, setUploading] = useState(false);
   const navigate = useNavigate();
@@ -23,7 +23,13 @@ const ManageArena = () => {
 
   const handleUpdateSettings = async (e) => {
     e.preventDefault();
-    const { error } = await supabase.from('arena_settings').update({ name: settings.name, address: settings.address }).eq('id', 1);
+    const { error } = await supabase.from('arena_settings').update({ 
+      name: settings.name, 
+      address: settings.address,
+      bank_info: settings.bank_info,
+      logo_url: settings.logo_url,
+      qris_url: settings.qris_url
+    }).eq('id', 1);
     if (error) alert('Gagal update: ' + error.message);
     else alert('Info Arena berhasil diupdate!');
   };
@@ -46,8 +52,17 @@ const ManageArena = () => {
     const publicUrl = data.publicUrl;
 
     if (type === 'logo') {
-      await supabase.from('arena_settings').update({ logo_url: publicUrl }).eq('id', 1);
-      setSettings(prev => ({ ...prev, logo_url: publicUrl }));
+      const { error } = await supabase.from('arena_settings').update({ logo_url: publicUrl }).eq('id', 1);
+      if (error) alert('Gagal simpan logo: ' + error.message);
+      else setSettings(prev => ({ ...prev, logo_url: publicUrl }));
+    } else if (type === 'qris') {
+      const { error } = await supabase.from('arena_settings').update({ qris_url: publicUrl }).eq('id', 1);
+      if (error) {
+        alert('Gagal simpan QRIS: ' + error.message);
+        console.error(error);
+      } else {
+        setSettings(prev => ({ ...prev, qris_url: publicUrl }));
+      }
     } else {
       await supabase.from('carousel_images').insert([{ image_url: publicUrl }]);
       fetchData();
@@ -79,6 +94,10 @@ const ManageArena = () => {
               <label className="block text-sm font-medium text-gray-700">Alamat</label>
               <textarea value={settings.address} onChange={e => setSettings({...settings, address: e.target.value})} className="w-full border p-2 rounded" />
             </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Info Rekening / Cara Bayar</label>
+              <textarea rows="3" value={settings.bank_info || ''} onChange={e => setSettings({...settings, bank_info: e.target.value})} className="w-full border p-2 rounded" placeholder="Contoh: BCA 123456 a.n Admin" />
+            </div>
             <button type="submit" className="bg-emerald-600 text-white px-4 py-2 rounded hover:bg-emerald-700 w-full">Simpan Info</button>
           </form>
           <div className="mt-6 pt-6 border-t">
@@ -88,6 +107,16 @@ const ManageArena = () => {
               <label className="cursor-pointer bg-gray-100 px-4 py-2 rounded border hover:bg-gray-200 flex items-center gap-2">
                 <Upload size={16} /> Ganti Logo
                 <input type="file" hidden accept="image/*" onChange={(e) => handleUpload(e.target.files[0], 'logo')} disabled={uploading} />
+              </label>
+            </div>
+          </div>
+          <div className="mt-6 pt-6 border-t">
+            <label className="block text-sm font-medium text-gray-700 mb-2">QRIS Pembayaran</label>
+            <div className="flex items-center gap-4">
+              {settings.qris_url && <img src={settings.qris_url} alt="QRIS" className="w-24 h-24 object-contain border rounded" />}
+              <label className="cursor-pointer bg-gray-100 px-4 py-2 rounded border hover:bg-gray-200 flex items-center gap-2">
+                <Upload size={16} /> Upload QRIS
+                <input type="file" hidden accept="image/*" onChange={(e) => handleUpload(e.target.files[0], 'qris')} disabled={uploading} />
               </label>
             </div>
           </div>

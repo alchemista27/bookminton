@@ -21,6 +21,7 @@ const UserDashboard = () => {
   const [paymentFile, setPaymentFile] = useState(null);
   const [bookingLoading, setBookingLoading] = useState(false);
   const [bookingStep, setBookingStep] = useState(1);
+  const [arenaSettings, setArenaSettings] = useState(null);
 
   useEffect(() => {
     const getUser = async () => {
@@ -33,6 +34,7 @@ const UserDashboard = () => {
     };
     getUser();
     fetchCourts();
+    fetchArenaSettings();
   }, []);
 
   useEffect(() => {
@@ -49,6 +51,11 @@ const UserDashboard = () => {
   const fetchCourts = async () => {
     const { data } = await supabase.from('courts').select('*');
     if (data) setCourts(data);
+  };
+
+  const fetchArenaSettings = async () => {
+    const { data } = await supabase.from('arena_settings').select('*').single();
+    if (data) setArenaSettings(data);
   };
 
   const fetchAvailableSchedules = async () => {
@@ -246,11 +253,26 @@ const UserDashboard = () => {
                 <div className="flex items-center gap-2 mb-3 text-emerald-800 font-bold">
                   <CreditCard size={20} /> Informasi Transfer
                 </div>
-                <p className="text-sm text-gray-700 mb-1">Silahkan transfer ke:</p>
-                <p className="text-xl font-mono font-bold text-gray-900 mb-4">BCA 123-456-7890 <span className="text-sm font-normal text-gray-500">(a.n Badminton Arena)</span></p>
                 
-                <label className="block text-sm font-medium text-emerald-900 mb-2">Upload Bukti Transfer</label>
-                <input type="file" required accept="image/*" onChange={e => setPaymentFile(e.target.files[0])} className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-emerald-100 file:text-emerald-700 hover:file:bg-emerald-200" />
+                <div className="grid md:grid-cols-2 gap-6 mb-4">
+                  <div>
+                    <p className="text-sm text-gray-700 mb-1 font-bold">Transfer Bank:</p>
+                    <p className="whitespace-pre-wrap text-gray-800 text-sm font-mono bg-white p-2 rounded border border-emerald-100">
+                      {arenaSettings?.bank_info || 'Hubungi Admin untuk info rekening.'}
+                    </p>
+                  </div>
+                  {arenaSettings?.qris_url && (
+                    <div>
+                      <p className="text-sm text-gray-700 mb-1 font-bold">Scan QRIS:</p>
+                      <img src={arenaSettings.qris_url} alt="QRIS" className="w-40 h-auto border rounded shadow-sm" />
+                    </div>
+                  )}
+                </div>
+                
+                <div className="border-t border-emerald-200 pt-4">
+                  <label className="block text-sm font-medium text-emerald-900 mb-2">Upload Bukti Transfer / Scan QRIS</label>
+                  <input type="file" required accept="image/*" onChange={e => setPaymentFile(e.target.files[0])} className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-emerald-100 file:text-emerald-700 hover:file:bg-emerald-200" />
+                </div>
               </div>
 
               <div className="flex gap-3">
