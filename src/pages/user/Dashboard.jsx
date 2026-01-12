@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../../supabaseClient';
-import { History, Calendar, User } from 'lucide-react';
+import { History, Calendar, User, CreditCard, ArrowLeft } from 'lucide-react';
 import { QRCodeCanvas } from 'qrcode.react';
 import { format } from 'date-fns';
 
@@ -20,6 +20,7 @@ const UserDashboard = () => {
   const [bookingForm, setBookingForm] = useState({ court_id: '', date: '' });
   const [paymentFile, setPaymentFile] = useState(null);
   const [bookingLoading, setBookingLoading] = useState(false);
+  const [bookingStep, setBookingStep] = useState(1);
 
   useEffect(() => {
     const getUser = async () => {
@@ -27,7 +28,7 @@ const UserDashboard = () => {
       if (!user) navigate('/user/login');
       else {
         setUser(user);
-        fetchUserBookings(user.id);
+        fetchUserBookings(user.user_metadata.phone);
       }
     };
     getUser();
@@ -40,8 +41,8 @@ const UserDashboard = () => {
     }
   }, [bookingForm.court_id, bookingForm.date]);
 
-  const fetchUserBookings = async (userId) => {
-    const { data } = await supabase.from('bookings').select('*, courts(name)').eq('user_id', userId).order('created_at', { ascending: false });
+  const fetchUserBookings = async (phone) => {
+    const { data } = await supabase.from('bookings').select('*, courts(name)').eq('user_phone', phone).order('created_at', { ascending: false });
     if (data) setBookings(data);
   };
 
@@ -84,7 +85,7 @@ const UserDashboard = () => {
     // Insert Bookings
     const bookingsToInsert = selectedSchedules.map(schedule => ({
       court_id: bookingForm.court_id,
-      user_id: user.id,
+      // user_id: user.id, // Dihapus sementara karena kolom belum ada di DB
       user_name: user.user_metadata.full_name,
       user_phone: user.user_metadata.phone,
       start_time: new Date(`${bookingForm.date}T${schedule.start_time}`).toISOString(),
@@ -110,6 +111,7 @@ const UserDashboard = () => {
       setPaymentFile(null);
       fetchUserBookings(user.id);
       setActiveTab('history');
+      setBookingStep(1);
     }
     setBookingLoading(false);
   };
@@ -168,8 +170,10 @@ const UserDashboard = () => {
 
       {activeTab === 'booking' && (
         <div className="bg-white p-6 rounded-lg shadow">
-          <h3 className="text-xl font-bold mb-4">Buat Booking Baru</h3>
-          <form onSubmit={handleBookingSubmit} className="space-y-4">
+          <h3 className="text-xl font-bold mb-4">{bookingStep === 1 ? 'Buat Booking Baru' : 'Pembayaran & Konfirmasi'}</h3>
+          
+          {bookingStep === 1 ? (
+            <div className="space-y-4">
             <div className="grid md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700">Pilih Lapangan</label>
@@ -202,18 +206,63 @@ const UserDashboard = () => {
               </div>
             )}
 
-            {selectedSchedules.length > 0 && (
+            <button 
+              disabled={selectedSchedules.length === 0} 
+              onClick={() => setBookingStep(2)}
+              className="w-full bg-emerald-600 text-white py-3 rounded font-bold hover:bg-emerald-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+            >
+              Lanjut Pembayaran
+            </button>
+            </div>
+          ) : (
+            <form onSubmit={handleBookingSubmit} className="space-y-6">
+              <div className="bg-gray-50 p-4 rounded border border-gray-200">
+                <h4 className="font-bold text-gray-800 border-b pb-2 mb-3">Ringkasan Pesanan</h4>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Lapangan</span>
+                    <span className="font-medium">{courts.find(c => c.id == bookingForm.court_id)?.name}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Tanggal</span>
+                    <span className="font-medium">{bookingForm.date}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Jadwal ({selectedSchedules.length} slot)</span>
+                    <div className="text-right font-medium">
+                      {selectedSchedules.map(s => (
+                        <div key={s.id}>{s.start_time.slice(0,5)} - {s.end_time.slice(0,5)}</div>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="flex justify-between border-t pt-2 mt-2 text-lg font-bold text-emerald-700">
+                    <span>Total Bayar</span>
+                    <span>Rp {(selectedSchedules.length * (courts.find(c => c.id == bookingForm.court_id)?.price || 0)).toLocaleString()}</span>
+                  </div>
+                </div>
+              </div>
+
               <div className="bg-emerald-50 p-4 rounded border border-emerald-200">
-                <p className="font-bold text-emerald-800 mb-2">Total: Rp {(selectedSchedules.length * (courts.find(c => c.id == bookingForm.court_id)?.price || 0)).toLocaleString()}</p>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Upload Bukti Transfer</label>
+                <div className="flex items-center gap-2 mb-3 text-emerald-800 font-bold">
+                  <CreditCard size={20} /> Informasi Transfer
+                </div>
+                <p className="text-sm text-gray-700 mb-1">Silahkan transfer ke:</p>
+                <p className="text-xl font-mono font-bold text-gray-900 mb-4">BCA 123-456-7890 <span className="text-sm font-normal text-gray-500">(a.n Badminton Arena)</span></p>
+                
+                <label className="block text-sm font-medium text-emerald-900 mb-2">Upload Bukti Transfer</label>
                 <input type="file" required accept="image/*" onChange={e => setPaymentFile(e.target.files[0])} className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-emerald-100 file:text-emerald-700 hover:file:bg-emerald-200" />
               </div>
-            )}
 
-            <button disabled={bookingLoading} type="submit" className="w-full bg-emerald-600 text-white py-3 rounded font-bold hover:bg-emerald-700">
-              {bookingLoading ? 'Memproses...' : 'Booking Sekarang'}
-            </button>
-          </form>
+              <div className="flex gap-3">
+                <button type="button" onClick={() => setBookingStep(1)} className="flex-1 bg-gray-200 text-gray-800 py-3 rounded font-bold hover:bg-gray-300 flex items-center justify-center gap-2">
+                  <ArrowLeft size={18} /> Kembali
+                </button>
+                <button disabled={bookingLoading} type="submit" className="flex-[2] bg-emerald-600 text-white py-3 rounded font-bold hover:bg-emerald-700">
+                  {bookingLoading ? 'Memproses...' : 'Kirim Bukti & Selesai'}
+                </button>
+              </div>
+            </form>
+          )}
         </div>
       )}
 
