@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../supabaseClient';
-import { Calendar, List, Image, LogOut, QrCode, FileText, Play, Trash2 } from 'lucide-react';
+import { Calendar, List, Image, LogOut, Search, FileText, Play, Trash2 } from 'lucide-react';
 import { differenceInSeconds, format } from 'date-fns';
 
 const AdminDashboard = () => {
   const [bookings, setBookings] = useState([]);
-  const [scanInput, setScanInput] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
   const navigate = useNavigate();
   
   useEffect(() => {
@@ -38,7 +38,6 @@ const AdminDashboard = () => {
     if (error) alert('Error check-in');
     else {
       alert('Check-in Berhasil! Waktu berjalan.');
-      setScanInput('');
       fetchBookings();
     }
   };
@@ -103,23 +102,16 @@ const AdminDashboard = () => {
         </div>
       </div>
 
-      <div className="bg-white p-6 rounded-lg shadow mb-8 flex gap-4 items-end">
-        <div className="flex-1">
-          <label className="block text-sm font-bold text-gray-700 mb-1">Scan QR / Input Booking ID</label>
-          <div className="flex gap-2">
-            <input 
-              value={scanInput}
-              onChange={(e) => setScanInput(e.target.value)}
-              placeholder="Paste UUID here..."
-              className="flex-1 border border-gray-300 rounded p-2 font-mono text-sm"
-            />
-            <button 
-              onClick={() => handleCheckIn(scanInput)}
-              className="bg-emerald-600 text-white px-4 py-2 rounded flex items-center gap-2 hover:bg-emerald-700"
-            >
-              <QrCode size={18} /> Check In
-            </button>
-          </div>
+      <div className="bg-white p-6 rounded-lg shadow mb-8">
+        <label className="block text-sm font-bold text-gray-700 mb-1">Cari Booking ID</label>
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+          <input 
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Ketik Booking ID..."
+            className="w-full border border-gray-300 rounded p-2 pl-10 font-mono text-sm focus:ring-emerald-500 focus:border-emerald-500 outline-none"
+          />
         </div>
       </div>
 
@@ -137,7 +129,7 @@ const AdminDashboard = () => {
             </tr>
           </thead>
           <tbody>
-            {bookings.map((b) => (
+            {bookings.filter(b => b.id.toLowerCase().includes(searchQuery.toLowerCase())).map((b) => (
               <tr key={b.id} className="border-b hover:bg-gray-50">
                 <td className="p-4 font-mono font-bold text-gray-700">{b.id.slice(0, 8).toUpperCase()}</td>
                 <td className="p-4 font-medium">{b.courts?.name}</td>

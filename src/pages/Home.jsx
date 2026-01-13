@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import { MapPin, Calendar, LogIn, Info } from 'lucide-react';
+import { format } from 'date-fns';
 
 const Home = () => {
   const [courts, setCourts] = useState([]);
@@ -50,10 +51,23 @@ const Home = () => {
       .order('start_time', { ascending: true });
     
     if (schedData) {
-      setSchedules(schedData);
+      const todayStr = format(new Date(), 'yyyy-MM-dd');
+      let filtered = schedData;
+
+      if (viewDate < todayStr) {
+        filtered = [];
+      } else if (viewDate === todayStr) {
+        const now = new Date();
+        const currentMinutes = now.getHours() * 60 + now.getMinutes();
+        filtered = schedData.filter(s => {
+          const [h, m] = s.start_time.split(':').map(Number);
+          return (h * 60 + m) > currentMinutes;
+        });
+      }
+      setSchedules(filtered);
       
       // Fetch bookings status for booked schedules
-      const bookedScheduleIds = schedData.filter(s => s.is_booked).map(s => s.id);
+      const bookedScheduleIds = filtered.filter(s => s.is_booked).map(s => s.id);
       if (bookedScheduleIds.length > 0) {
         const { data: bookData } = await supabase
           .from('bookings')
@@ -134,6 +148,7 @@ const Home = () => {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Tanggal</label>
                 <input 
                   type="date" 
+                  min={format(new Date(), 'yyyy-MM-dd')}
                   className="w-full border p-2 rounded focus:ring-emerald-500 focus:border-emerald-500"
                   value={viewDate}
                   onChange={e => setViewDate(e.target.value)}

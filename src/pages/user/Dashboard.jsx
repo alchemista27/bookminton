@@ -65,7 +65,23 @@ const UserDashboard = () => {
       .eq('date', bookingForm.date)
       .eq('is_booked', false)
       .order('start_time', { ascending: true });
-    if (data) setAvailableSchedules(data);
+    
+    if (data) {
+      const todayStr = format(new Date(), 'yyyy-MM-dd');
+      let filtered = data;
+
+      if (bookingForm.date < todayStr) {
+        filtered = [];
+      } else if (bookingForm.date === todayStr) {
+        const now = new Date();
+        const currentMinutes = now.getHours() * 60 + now.getMinutes();
+        filtered = data.filter(s => {
+          const [h, m] = s.start_time.split(':').map(Number);
+          return (h * 60 + m) > currentMinutes;
+        });
+      }
+      setAvailableSchedules(filtered);
+    }
   };
 
   const handleBookingSubmit = async (e) => {
@@ -191,7 +207,14 @@ const UserDashboard = () => {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700">Tanggal</label>
-                <input type="date" required className="w-full border p-2 rounded" value={bookingForm.date} onChange={e => setBookingForm({...bookingForm, date: e.target.value})} />
+                <input 
+                  type="date" 
+                  required 
+                  min={format(new Date(), 'yyyy-MM-dd')}
+                  className="w-full border p-2 rounded" 
+                  value={bookingForm.date} 
+                  onChange={e => setBookingForm({...bookingForm, date: e.target.value})} 
+                />
               </div>
             </div>
 
