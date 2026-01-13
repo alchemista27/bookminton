@@ -8,6 +8,16 @@ Fitur utama
 - Integrasi Supabase (Auth & Database)
 - Ekspor/print transaksi ke PDF dan dukungan QR code
 
+## Preview Aplikasi
+
+Berikut adalah beberapa tampilan antarmuka aplikasi Bookminton:
+
+![Halaman Home](screenshots/home-page.png)
+*Tampilan Halaman Utama*
+
+![Dashboard Admin](screenshots/admin-dashboard.png)
+*Tampilan Dashboard Admin*
+
 Teknologi
 - React 19 + Vite
 - Tailwind CSS
